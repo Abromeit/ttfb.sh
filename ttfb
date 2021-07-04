@@ -12,28 +12,31 @@
 # Usage: ttfb [options] url [url...]
 #   -d debug
 #   -l <log file> (infers -d) log response headers. Defaults to ./curl.log
-#   -n <number> of times to test time to first byte
+#   -n <number> of times to test time to first byte (default:1)
 #   -s <number> of seconds to sleep between each request to the same url (default:4, disabled:0)
 #   -v verbose output. Show request breakdown during -n calls
 #
 # Examples:
 #
-# ttfb https://example.com/example/url
+# ttfb 'https://example.com/example/url'
+# 0.098974sec
+#
+# ttfb 'https://example.com/example/url' | cat
 # 0.098974
 #
-# ttfb -n 5 https://example.com/
+# ttfb -n 5 'https://example.com/'
 # .....
-# fastest 0.099195 slowest 0.103138 median 0.099684
+# fastest 0.099195sec slowest 0.103138sec median 0.099684sec
 #
-# ttfb -n 5 bbc.co.uk news.bbc.co.uk
+# ttfb -n 5 'bbc.co.uk' 'news.bbc.co.uk'
 # .....
 # .....
-# bbc.co.uk       fastest 0.045873 slowest 0.046870 median 0.045999
-# news.bbc.co.uk  fastest 0.042286 slowest 0.060245 median 0.046035
+# bbc.co.uk       fastest 0.045873sec slowest 0.046870sec median 0.045999sec
+# news.bbc.co.uk  fastest 0.042286sec slowest 0.060245sec median 0.046035sec
 #
-# ttfb bbc.co.uk news.bbc.co.uk
-# bbc.co.uk        0.048378
-# news.bbc.co.uk   0.049303
+# ttfb 'bbc.co.uk' 'news.bbc.co.uk'
+# bbc.co.uk        0.048378sec
+# news.bbc.co.uk   0.049303sec
 #
 # Implicitly follows redirects using curl's -L option.
 #
@@ -101,7 +104,7 @@ show_usage() {
 # defaults
 DEBUG=""
 LOG=""
-NUM_REQUESTS="0"
+NUM_REQUESTS="1"
 SLEEP_SECONDS="4"
 VERBOSE="0"
 
@@ -125,8 +128,15 @@ do
     esac
 done
 
-if [[ -z ${NUM_REQUESTS} ]]; then
-  NUM_REQUESTS="0"
+if [[ -z ${NUM_REQUESTS} || ${NUM_REQUESTS} -le 0 ]]; then
+  NUM_REQUESTS="1"
+fi
+
+if [[ -z ${SLEEP_SECONDS} ]]; then
+  SLEEP_SECONDS="4"
+fi
+if [[ -n ${SLEEP_SECONDS} && ${SLEEP_SECONDS} -le -1 ]]; then
+  SLEEP_SECONDS="0"
 fi
 
 shift $((OPTIND - 1))  # shifts away every option argument,
@@ -170,9 +180,11 @@ if [ "${DEBUG}" -eq 1 ]; then
   options+=(-D "${LOG_DIRECTORY}/${LOG}")
 fi
 
-SHOW_HEADER="\nServer Response Time (TTFB):\n"
+SHOW_HEADER="\n\e[37;1mSelected Config:\e[0m\n-> ${NUM_REQUESTS} Requests per URL\n-> ${SLEEP_SECONDS}sec pause between each Request\n"
 if [[ ${NUM_URLS} -gt 1 || ${NUM_REQUESTS} -gt 1 ]]; then
-  SHOW_HEADER="\nServer Response Times (TTFB):\n"
+  SHOW_HEADER+="\n\e[37;1mServer Response Times (TTFB):\e[0m\n"
+else
+  SHOW_HEADER+="\n\e[37;1mServer Response Time (TTFB):\e[0m\n"
 fi
 
 for URL in "${URLS[@]}"; do
