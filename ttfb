@@ -205,7 +205,7 @@ for URL in "${URLS[@]}"; do
       fi
 
       request=$(eval $(curl "${options[@]}" "${URL}"))
-      ttfbs+=( $(echo ${request} | grep -oE "TTFB: 0.{0,7}" | cut -d' ' -f2 | sort -n) )
+      ttfbs+=( $(echo ${request} | grep -oE "TTFB: .{0,7}" | cut -d' ' -f2 | sort -n) )
       if [ "${VERBOSE}" -eq 1 ]; then
         echo "${request}" >&2
       else
@@ -241,7 +241,7 @@ for URL in "${URLS[@]}"; do
    else
 
     request=$(eval $(curl "${options[@]}" "${URL}"))
-    ttfb=$(echo "${request}" | grep -oE "TTFB: 0.{0,7}" | cut -d' ' -f2);
+    ttfb=$(echo "${request}" | grep -oE "TTFB: .{0,7}" | cut -d' ' -f2);
     
     if [ "${IS_TTY}" -eq 1 ]; then
       # output goes to a tty
