@@ -92,13 +92,14 @@ median() {
 }
 
 show_usage() {
-  echo -e "Usage: ttfb [options] url [url...]\n\t-d debug\n\t-l <log file> (infers -d) log response headers. Defaults to ./curl.log\n\t-n <number> of times to test time to first byte\n\t-v verbose output. Show response breakdown (DNS lookup, TLS handshake etc)" >&2
+  echo -e "Usage: ttfb [options] url [url...]\n\t-d debug\n\t-l <log file> (infers -d) log response headers. Defaults to ./curl.log\n\t-n <number> of times to test time to first byte\n\t-s <number> of seconds to sleep between each request (default:4, disabled:0)\n\t-v verbose output. Show response breakdown (DNS lookup, TLS handshake etc)" >&2
 }
 
 # defaults
 DEBUG=""
 LOG=""
 NUM_REQUESTS=0
+SLEEP_SECONDS=4
 VERBOSE=0
 
 IS_TTY=0
@@ -112,6 +113,7 @@ do
         d) DEBUG=1 ;;
         l) LOG="$OPTARG" ;;
         n) NUM_REQUESTS=$OPTARG ;;
+        s) SLEEP_SECONDS=$OPTARG ;;
         v) VERBOSE=1 ;;
         \?) show_usage
             exit 1
@@ -197,6 +199,8 @@ for URL in $URLS; do
       else
         printf "." >&2
       fi
+
+      sleep "${SLEEP_SECONDS}"
     done
 
     # tidy up - combine multiple request logs for the same url into a single file
