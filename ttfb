@@ -107,7 +107,7 @@ if [ -t 1 ]; then
   IS_TTY=1
 fi
 
-while getopts ":n:dl:v" OPTION
+while getopts ":n:s:dl:v" OPTION
 do
     case $OPTION in
         d) DEBUG=1 ;;
