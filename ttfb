@@ -101,6 +101,11 @@ LOG=""
 NUM_REQUESTS=0
 VERBOSE=0
 
+IS_TTY=0
+if [ -t 1 ]; then
+  IS_TTY=1
+fi
+
 while getopts ":n:dl:v" OPTION
 do
     case $OPTION in
@@ -149,10 +154,12 @@ options+=(-s)
 options+=(-L)
 options+=($HTTP_VERSION)
 options+=(-H 'Cache-Control: no-cache')
-options+=(-w 'echo DNS lookup: %{time_namelookup} TLS handshake: %{time_appconnect} TTFB including connection: %{time_starttransfer} TTFB: $(echo %{time_starttransfer} - %{time_appconnect} | bc) Total time: %{time_total} \n')
+options+=(-w 'echo DNS lookup: %{time_namelookup} TLS handshake: %{time_appconnect} TTFB including connection: %{time_starttransfer} TTFB: $(echo %{time_starttransfer} - %{time_appconnect} | bc | awk '"'"'{printf "%.5f\n", $0}'"'"') Total time: %{time_total} \n')
 if [ $DEBUG -eq 1 ]; then
   options+=(-D "${LOG_DIRECTORY}/${LOG}")
 fi
+
+SHOW_HEADER="\nServer Response Times (TTFB):\n"
 
 for URL in $URLS; do
 
@@ -184,7 +191,7 @@ for URL in $URLS; do
       fi
 
       request=$(eval $(curl "${options[@]}" "$URL"))
-      ttfbs+=($(echo $request | grep -oE "TTFB: .{0,7}" | cut -d' ' -f2 | sort -n));
+      ttfbs+=($(echo $request | grep -oE "TTFB: 0.{0,7}" | cut -d' ' -f2 | sort -n));
       if [ $VERBOSE -eq 1 ]; then
         echo "$request" >&2
       else
@@ -201,16 +208,35 @@ for URL in $URLS; do
       rm "${LOG_DIRECTORY}/${LOG}_"*
     fi
 
+    if [ -n "${SHOW_HEADER}" ]; then
+      echo -ne "${SHOW_HEADER}"
+      SHOW_HEADER=""
+    fi
+    
     printf "\n" >&2
     # sort the times
     ttfbs=( $( printf "%s\n" "${ttfbs[@]}" | sort -n ) )
     # show quickest, slowest and median fftb
-    printf "${SHOW_URL}\e[32mfastest \e[39m${ttfbs[0]} \e[91mslowest \e[39m${ttfbs[${#ttfbs[*]}-1]} \e[95mmedian \e[39m$(median ${ttfbs[*]})\e[39m\n";
+    printf "%s\e[32mfastest \e[39m%ssec \e[91mslowest \e[39m%ssec \e[95mmedian \e[39m%ssec\e[39m\n" "${SHOW_URL}" "${ttfbs[0]}" "${ttfbs[${#ttfbs[*]}-1]}" "$(median ${ttfbs[*]})"
   else
+  
    if [ $VERBOSE -eq 1 ]; then
      echo -e $SHOW_URL $(eval $(curl "${options[@]}" "$URL"))
    else
-     echo -e $SHOW_URL $(eval $(curl "${options[@]}" "$URL") | grep -oE "TTFB: .{0,7}" | cut -d' ' -f2)
+
+    request=$(eval $(curl "${options[@]}" "$URL"))
+    ttfb=$(echo $request | grep -oE "TTFB: 0.{0,7}" | cut -d' ' -f2);
+    
+    if [ $IS_TTY -eq 1 ]; then
+      # output goes to a tty
+      echo -ne "\nServer Response Time (TTFB):\n"
+      printf "%s%ssec\n" "${SHOW_URL}" "${ttfb}"
+    else
+      # output goes to a pipe, a file or similar
+      printf "%s%s\n" "${SHOW_URL}" "${ttfb}"
+    fi
+     
    fi
+
   fi
 done | column -s'|' -t
