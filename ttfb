@@ -67,7 +67,7 @@
 set -eu
 
 # check dependencies
-for dependency in awk curl bc column; do
+for dependency in awk bc column curl; do
   which "${dependency}" > /dev/null || (echo "You need to have '${dependency}' installed and in your \$PATH" >&2 && exit 1)
 done
 

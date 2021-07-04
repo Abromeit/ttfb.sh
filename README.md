@@ -2,13 +2,17 @@
 
 Measures [time-to-first-byte](https://en.wikipedia.org/wiki/Time_to_first_byte) for single or multiple URLs. Can show you quickest, slowest & median TTFB values plus optionally log all response headers.
 
-![Sample run of ttfb.sh](https://github.com/jaygooby/ttfb.sh/raw/readme-assets/demo.gif)
+![Screenshot of an example result of a ttfb.sh run](docs/example-result.png)
+
+
+# Usage
 
 ```
 Usage: ttfb [options] url [url...]
 	-d debug
 	-l <log file> (infers -d) log response headers. Defaults to ./curl.log
-	-n <number> of times to test time to first byte
+	-n <number> of times to test time to first byte (default:1)
+	-s <number> of seconds to sleep between each request to the same url (default:4, disabled:0)
 	-v verbose output. Show response breakdown (DNS lookup, TLS handshake etc)
 ```
 
@@ -29,36 +33,28 @@ Uses the calculation `%{time_starttransfer¹} - %{time_appconnect²}` which does
 >The time, in seconds, it took from the start until the SSL/SSH/etc
 connect/handshake to the remote host was completed.
 
-# Genesis
-Based on a [gist](https://gist.github.com/sandeepraju/1f5fbdbdd89551ba7925abe2645f92b5)
-by https://github.com/sandeepraju
-
-Modified by jay@gooby.org, [@jaygooby](https://twitter.com/jaygooby)
-
-# Usage
-
-```
-Usage: ttfb [options] url [url...]
-	-d debug
-	-l <log file> (infers -d) log response headers. Defaults to ./curl.log
-	-n <number> of times to test time to first byte
-	-v verbose output. Show response breakdown (DNS lookup, TLS handshake etc)
-```
-
-## Examples
+# Examples
 
 Basic usage:
 
 ```
 $ ttfb example.com
-.227436
+0.227436sec
+```
+
+A simplified data format is returned, 
+when stdout doesn't directly go to a tty:
+
+```
+$ ttfb example.com | cat
+0.227436
 ```
 
 Basic usage with verbose response breakdown:
 
 ```
 $ ttfb -v https://example.com
-DNS lookup: 0.005152 TLS handshake: 0.000000 TTFB including connection: 0.200831 TTFB: .200831 Total time: 0.201132
+DNS lookup: 0.005152 TLS handshake: 0.000000 TTFB including connection: 0.200831 TTFB: 0.200831 Total time: 0.201132
 ```
 
 Test multiple times:
@@ -66,15 +62,15 @@ Test multiple times:
 ```
 $ ttfb -n 5 example.com/example/url
 .....
-fastest .177263 slowest .214302 median .179957
+fastest 0.177263sec slowest 0.214302sec median 0.179957sec
 ```
 
 Test multiple URLs:
 
 ```
 $ ttfb bbc.co.uk news.bbc.co.uk
-bbc.co.uk        .049985
-news.bbc.co.uk   .054122
+bbc.co.uk        0.049985sec
+news.bbc.co.uk   0.054122sec
 ```
 
 Test multiple URLs, multiple times:
@@ -83,21 +79,31 @@ Test multiple URLs, multiple times:
 $ ttfb -n 5 bbc.co.uk news.bbc.co.uk
 .....
 .....
-bbc.co.uk       fastest .030936 slowest .057755 median .034663
-news.bbc.co.uk  fastest .031413 slowest .182791 median .035001
+bbc.co.uk       fastest 0.030936sec slowest 0.057755sec median 0.034663sec
+news.bbc.co.uk  fastest 0.031413sec slowest 0.182791sec median 0.035001sec
+```
+
+Test multiple URLs, multiple times - but turn off sleep between requests:
+
+```
+$ ttfb -n 5 -s 0 bbc.co.uk news.bbc.co.uk
+.....
+.....
+bbc.co.uk       fastest 0.030936sec slowest 0.057755sec median 0.034663sec
+news.bbc.co.uk  fastest 0.031413sec slowest 0.182791sec median 0.035001sec
 ```
 
 Verbose response breakdown when multiple tests specified:
 
 ```
 $ ttfb -v -n 5 bbc.co.uk
-DNS lookup: 0.005335 TLS handshake: 0.102314 TTFB including connection: 0.148328 TTFB: .046014 Total time: 0.646115
-DNS lookup: 0.005322 TLS handshake: 0.102609 TTFB including connection: 0.150693 TTFB: .048084 Total time: 0.644611
-DNS lookup: 0.004277 TLS handshake: 0.102066 TTFB including connection: 0.172199 TTFB: .070133 Total time: 1.196256
-DNS lookup: 0.004444 TLS handshake: 0.107375 TTFB including connection: 0.160771 TTFB: .053396 Total time: 0.637290
-DNS lookup: 0.005352 TLS handshake: 0.118882 TTFB including connection: 0.168772 TTFB: .049890 Total time: 0.653761
+DNS lookup: 0.005335 TLS handshake: 0.102314 TTFB including connection: 0.148328 TTFB: 0.046014 Total time: 0.646115
+DNS lookup: 0.005322 TLS handshake: 0.102609 TTFB including connection: 0.150693 TTFB: 0.048084 Total time: 0.644611
+DNS lookup: 0.004277 TLS handshake: 0.102066 TTFB including connection: 0.172199 TTFB: 0.070133 Total time: 1.196256
+DNS lookup: 0.004444 TLS handshake: 0.107375 TTFB including connection: 0.160771 TTFB: 0.053396 Total time: 0.637290
+DNS lookup: 0.005352 TLS handshake: 0.118882 TTFB including connection: 0.168772 TTFB: 0.049890 Total time: 0.653761
 
-fastest .046014 slowest .070133 median .049890
+fastest 0.046014sec slowest 0.070133sec median 0.049890sec
 ```
 
 Log all the response headers for multiple tests to multiple URLs:
@@ -106,8 +112,8 @@ Log all the response headers for multiple tests to multiple URLs:
 ttfb -d -n 2 bbc.co.uk https://www.bbc.co.uk/weather
 ..
 ..
-bbc.co.uk                      fastest .027550 slowest .055215 median .041382
-https://www.bbc.co.uk/weather  fastest .101020 slowest .297923 median .199471
+bbc.co.uk                      fastest 0.027550sec slowest 0.055215sec median 0.041382sec
+https://www.bbc.co.uk/weather  fastest 0.101020sec slowest 0.297923sec median 0.199471sec
 
 $ ls *.log
 bbc_co_uk-curl.log                     https___www_bbc_co_uk_weather-curl.log
@@ -160,12 +166,14 @@ the time without the connection overhead:
 `%{time_starttransfer} - %{time_appconnect}`
 
 Uses a dirty `eval` to do the ttfb arithmetic. Depends
-on `bc` and `column` commands.
+on `awk`, `bc`, `column` and `curl` commands.
 
-# TODO
 
-  * [x] Show progress when more than one request (`-n 2` etc) option is set
+# Genesis
 
-  * [ ] Sort output by fastest TTFB when multiple URLs are supplied
+Based on a [gist](https://gist.github.com/sandeepraju/1f5fbdbdd89551ba7925abe2645f92b5)
+by https://github.com/sandeepraju
 
-  * [ ] Colour code the `TTFB:` figure in the standard response, according to the speed of the response.
+Modified by [jay@gooby.org](https://github.com/jaygooby), [@jaygooby](https://twitter.com/jaygooby)
+
+Modified by [d.abromeit@koch-essen.de](https://github.com/Abromeit), [@der_abro](https://twitter.com/der_abro)
