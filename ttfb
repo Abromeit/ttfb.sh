@@ -91,7 +91,7 @@ median() {
     (( k=j-1 ))
     val=$(echo "scale=6;(${arr[j]}" + "${arr[k]})" / 2 | bc -l)
   fi
-  echo "${val}"
+  echo -n "${val}" | awk '{printf "%.5f\n", $0}'
 }
 
 show_usage() {
