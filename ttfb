@@ -2,35 +2,38 @@
 #
 # Shows time in seconds to first byte of a url or urls
 #
-# Based on a gist https://gist.github.com/sandeepraju/1f5fbdbdd89551ba7925abe2645f92b5
-# by https://github.com/sandeepraju
-#
-# Modified by jay@gooby.org, @jaygooby
+# Based on a gist 
+# - https://gist.github.com/sandeepraju/1f5fbdbdd89551ba7925abe2645f92b5
+#   by https://github.com/sandeepraju
+# Modified by 
+# - jay@gooby.org , https://github.com/jaygooby , https://twitter.com/jaygooby
+# - d.abromeit@koch-essen.de , https://github.com/Abromeit , https://twitter.com/der_abro
 #
 # Usage: ttfb [options] url [url...]
 #   -d debug
 #   -l <log file> (infers -d) log response headers. Defaults to ./curl.log
 #   -n <number> of times to test time to first byte
+#   -s <number> of seconds to sleep between each request to the same url (default:4, disabled:0)
 #   -v verbose output. Show request breakdown during -n calls
 #
 # Examples:
 #
 # ttfb https://example.com/example/url
-# .098974
+# 0.098974
 #
 # ttfb -n 5 https://example.com/
 # .....
-# fastest .099195 slowest .103138 median .099684
+# fastest 0.099195 slowest 0.103138 median 0.099684
 #
 # ttfb -n 5 bbc.co.uk news.bbc.co.uk
 # .....
 # .....
-# bbc.co.uk       fastest .045873 slowest .046870 median .045999
-# news.bbc.co.uk  fastest .042286 slowest .060245 median .046035
+# bbc.co.uk       fastest 0.045873 slowest 0.046870 median 0.045999
+# news.bbc.co.uk  fastest 0.042286 slowest 0.060245 median 0.046035
 #
 # ttfb bbc.co.uk news.bbc.co.uk
-# bbc.co.uk        .048378
-# news.bbc.co.uk   .049303
+# bbc.co.uk        0.048378
+# news.bbc.co.uk   0.049303
 #
 # Implicitly follows redirects using curl's -L option.
 #
@@ -61,13 +64,13 @@
 set -eu
 
 # check dependencies
-for dependency in curl bc column; do
-  which $dependency > /dev/null || (echo "You need to have '$dependency' installed and in your \$PATH" >&2 && exit 1)
+for dependency in awk curl bc column; do
+  which "${dependency}" > /dev/null || (echo "You need to have '${dependency}' installed and in your \$PATH" >&2 && exit 1)
 done
 
 # Ensure curl uses period separators for floating point values, which
 # bc requires to do calculations (i.e. it can't use locale separators like ,)
-if (locale -a | egrep ^C.UTF-8$ > /dev/null); then
+if (locale -a | grep -E ^C\.UTF-8$ > /dev/null); then
   export LC_ALL=C.UTF-8
 else
   export LC_ALL=C
@@ -75,20 +78,20 @@ fi
 
 # check curl can use http2
 HTTP_VERSION="--http2"
-curl -so /dev/null --http2 https://example.com || HTTP_VERSION="--http1.1"
+curl -so /dev/null --http2 "https://example.com" || HTTP_VERSION="--http1.1"
 
 # Cribbed from https://stackoverflow.com/a/41762669/391826
 median() {
-  arr=($(printf '%s\n' "${@}" | sort -n))
+  arr=( $(printf '%s\n' "${@}" | sort -n) )
   nel=${#arr[@]}
   if (( $nel % 2 == 1 )); then     # Odd number of elements
     val="${arr[ $(($nel/2)) ]}"
   else                            # Even number of elements
     (( j=nel/2 ))
     (( k=j-1 ))
-    val=$(echo "scale=6;(${arr[j]}" + "${arr[k]})"/2|bc -l)
+    val=$(echo "scale=6;(${arr[j]}" + "${arr[k]})" / 2 | bc -l)
   fi
-  echo $val
+  echo "${val}"
 }
 
 show_usage() {
@@ -98,28 +101,33 @@ show_usage() {
 # defaults
 DEBUG=""
 LOG=""
-NUM_REQUESTS=0
-SLEEP_SECONDS=4
-VERBOSE=0
+NUM_REQUESTS="0"
+SLEEP_SECONDS="4"
+VERBOSE="0"
 
-IS_TTY=0
 if [ -t 1 ]; then
-  IS_TTY=1
+  readonly IS_TTY="1"
+else
+  readonly IS_TTY="0"
 fi
 
 while getopts ":n:s:dl:v" OPTION
 do
-    case $OPTION in
-        d) DEBUG=1 ;;
-        l) LOG="$OPTARG" ;;
-        n) NUM_REQUESTS=$OPTARG ;;
-        s) SLEEP_SECONDS=$OPTARG ;;
-        v) VERBOSE=1 ;;
+    case ${OPTION} in
+        d) DEBUG="1" ;;
+        l) LOG="${OPTARG}" ;;
+        n) NUM_REQUESTS="${OPTARG}" ;;
+        s) SLEEP_SECONDS="${OPTARG}" ;;
+        v) VERBOSE="1" ;;
         \?) show_usage
             exit 1
             ;;
     esac
 done
+
+if [[ -z ${NUM_REQUESTS} ]]; then
+  NUM_REQUESTS="0"
+fi
 
 shift $((OPTIND - 1))  # shifts away every option argument,
                        # leaving urls as $@
@@ -130,40 +138,40 @@ if [ -z "${1:-}" ]; then
 fi
 
 URLS=( "$@" )
-NUM_URLS=${#URLS[@]}
+NUM_URLS="${#URLS[@]}"
 
 # if we're given a custom log file, or log directory, implicitly set DEBUG=1
-[ -n "$LOG" ] && DEBUG=1
+[ -n "${LOG}" ] && DEBUG="1"
 
 # default the log file to curl.log in pwd or LOG_DIRECTORY if -o was specified
 LOG="${LOG:-curl.log}"
 
 # now work out if $LOG is relative or an absolute path
 # and then get the dirname
-[ "$LOG" != "${LOG#/}" ] && LOG_DIRECTORY=$(dirname "$LOG") || LOG_DIRECTORY=$(dirname "${PWD}/$LOG")
-if [ ! -d "$LOG_DIRECTORY" ]; then
-   echo "Log directory $LOG_DIRECTORY doesn't exist" >&2
+[ "${LOG}" != "${LOG#/}" ] && LOG_DIRECTORY=$(dirname "${LOG}") || LOG_DIRECTORY=$(dirname "${PWD}/${LOG}")
+if [ ! -d "${LOG_DIRECTORY}" ]; then
+   echo "Log directory ${LOG_DIRECTORY} doesn't exist" >&2
    exit 1;
 fi
 
 # then set the actual log filename
-LOG=$(basename "$LOG")
+LOG=$(basename "${LOG}")
 
-DEBUG=${DEBUG:-0}
+DEBUG="${DEBUG:-0}"
 
 options=()
 options+=(-o /dev/null)
 options+=(-s)
 options+=(-L)
-options+=($HTTP_VERSION)
+options+=("${HTTP_VERSION}")
 options+=(-H 'Cache-Control: no-cache')
 options+=(-w 'echo DNS lookup: %{time_namelookup} TLS handshake: %{time_appconnect} TTFB including connection: %{time_starttransfer} TTFB: $(echo %{time_starttransfer} - %{time_appconnect} | bc | awk '"'"'{printf "%.5f\n", $0}'"'"') Total time: %{time_total} \n')
-if [ $DEBUG -eq 1 ]; then
+if [ "${DEBUG}" -eq 1 ]; then
   options+=(-D "${LOG_DIRECTORY}/${LOG}")
 fi
 
 SHOW_HEADER="\nServer Response Time (TTFB):\n"
-if [[ "${NUM_URLS}" -gt 1 || ( -n "$NUM_REQUESTS" && "$NUM_REQUESTS" -gt 1 ) ]]; then
+if [[ ${NUM_URLS} -gt 1 || ${NUM_REQUESTS} -gt 1 ]]; then
   SHOW_HEADER="\nServer Response Times (TTFB):\n"
 fi
 
@@ -173,33 +181,33 @@ for URL in "${URLS[@]}"; do
   # output the url on the results line
   if [ "${NUM_URLS}" -gt 1 ]; then
     SHOW_URL="${URL}|"
-    if [[ $VERBOSE -eq 1 && -n "$NUM_REQUESTS" && "$NUM_REQUESTS" -gt 1 ]]; then
-      echo $URL >&2
+    if [[ ${VERBOSE} -eq 1 && ${NUM_REQUESTS} -gt 1 ]]; then
+      echo "${URL}" >&2
     fi
   else
     SHOW_URL=""
   fi
 
   # if multiple requests have been specified, then show min, max & median values
-  if [[ -n "$NUM_REQUESTS" && "$NUM_REQUESTS" -gt 1 ]]; then
+  if [[ ${NUM_REQUESTS} -gt 1 ]]; then
     ttfbs=()
-    for i in $(seq $NUM_REQUESTS); do
+    for i in $(seq "${NUM_REQUESTS}"); do
 
       # if we're checking more than one url, and debug is set, then log
       # the headers to a per-url file, but also for each request
-      if [[ ${NUM_URLS} -gt 1 && $DEBUG -eq 1 ]]; then
+      if [[ ${NUM_URLS} -gt 1 && ${DEBUG} -eq 1 ]]; then
         LOGFILE="${URL//[^[:alnum:]]/_}"
         options+=(-D "${LOG_DIRECTORY}/${LOGFILE}-${LOG}_${i}")
-      elif [ $DEBUG -eq 1 ]; then
+      elif [ "${DEBUG}" -eq 1 ]; then
         # we only have the one URL, but we still are requesting multiple
         # ttfb calls, so log the headers
         options+=(-D "${LOG_DIRECTORY}/${LOG}_${i}")
       fi
 
-      request=$(eval $(curl "${options[@]}" "$URL"))
-      ttfbs+=($(echo $request | grep -oE "TTFB: 0.{0,7}" | cut -d' ' -f2 | sort -n));
-      if [ $VERBOSE -eq 1 ]; then
-        echo "$request" >&2
+      request=$(eval $(curl "${options[@]}" "${URL}"))
+      ttfbs+=( $(echo ${request} | grep -oE "TTFB: 0.{0,7}" | cut -d' ' -f2 | sort -n) )
+      if [ "${VERBOSE}" -eq 1 ]; then
+        echo "${request}" >&2
       else
         printf "." >&2
       fi
@@ -208,10 +216,10 @@ for URL in "${URLS[@]}"; do
     done
 
     # tidy up - combine multiple request logs for the same url into a single file
-    if [[ ${#@} -gt 1 && $DEBUG -eq 1 ]]; then
+    if [[ ${NUM_URLS} -gt 1 && ${DEBUG} -eq 1 ]]; then
       cat "${LOG_DIRECTORY}/${LOGFILE}-${LOG}_"* > "${LOG_DIRECTORY}/${LOGFILE}-${LOG}"
       rm "${LOG_DIRECTORY}/${LOGFILE}-${LOG}_"*
-    elif [ $DEBUG -eq 1 ]; then
+    elif [ "${DEBUG}" -eq 1 ]; then
       cat "${LOG_DIRECTORY}/${LOG}_"* > "${LOG_DIRECTORY}/${LOG}"
       rm "${LOG_DIRECTORY}/${LOG}_"*
     fi
@@ -223,19 +231,19 @@ for URL in "${URLS[@]}"; do
     
     printf "\n" >&2
     # sort the times
-    ttfbs=( $( printf "%s\n" "${ttfbs[@]}" | sort -n ) )
+    ttfbs=( $(printf "%s\n" "${ttfbs[@]}" | sort -n) )
     # show quickest, slowest and median fftb
     printf "%s\e[32mfastest \e[39m%ssec \e[91mslowest \e[39m%ssec \e[95mmedian \e[39m%ssec\e[39m\n" "${SHOW_URL}" "${ttfbs[0]}" "${ttfbs[${#ttfbs[*]}-1]}" "$(median ${ttfbs[*]})"
   else
   
-   if [ $VERBOSE -eq 1 ]; then
-     echo -e $SHOW_URL $(eval $(curl "${options[@]}" "$URL"))
+   if [ "${VERBOSE}" -eq 1 ]; then
+     echo -e "${SHOW_URL}" $(eval $(curl "${options[@]}" "${URL}"))
    else
 
-    request=$(eval $(curl "${options[@]}" "$URL"))
-    ttfb=$(echo $request | grep -oE "TTFB: 0.{0,7}" | cut -d' ' -f2);
+    request=$(eval $(curl "${options[@]}" "${URL}"))
+    ttfb=$(echo "${request}" | grep -oE "TTFB: 0.{0,7}" | cut -d' ' -f2);
     
-    if [ $IS_TTY -eq 1 ]; then
+    if [ "${IS_TTY}" -eq 1 ]; then
       # output goes to a tty
 
       if [ -n "${SHOW_HEADER}" ]; then
